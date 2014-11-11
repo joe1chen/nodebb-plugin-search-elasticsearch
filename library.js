@@ -129,17 +129,15 @@ Elasticsearch.getTopicCount = function(callback) {
 		return callback(new Error('not-connected'));
 	}
 
+	// TODO
 	Elasticsearch.client.count({
-		index: Elasticsearch.config.posts_index_name,
+		index: Elasticsearch.config.posts_index_name/*,
+		type: 'posts',
 		body: {
-			filtered: {
-				filter: {
-					exists: {
-						field: "title"
-					}
-				}
+			exists: {
+				field: "title"
 			}
-		}
+		}*/
 	}, function (error, response) {
 		if (!error && response) {
 			callback(null, response.count);
@@ -223,9 +221,9 @@ Elasticsearch.search = function(data, callback) {
 		Elasticsearch.client.search(query, function(err, obj) {
 			if (err) {
 				callback(err);
-			} else if (obj && obj.response && obj.response.docs.length > 0) {
-				var payload = obj.response.docs.map(function(result) {
-					return result.id;
+			} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
+				var payload = obj.hits.hits.map(function(result) {
+					return result._id;
 				});
 
 				callback(null, payload);
@@ -273,9 +271,9 @@ Elasticsearch.searchTopic = function(data, callback) {
 		Elasticsearch.client.search(query, function(err, obj) {
 			if (err) {
 				callback(err);
-			} else if (obj && obj.response && obj.response.docs.length > 0) {
-				callback(null, obj.response.docs.map(function(result) {
-					return result.id;
+			} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
+				callback(null, obj.hits.hits.map(function(result) {
+					return result._id;
 				}));
 			} else {
 				callback(null, []);
