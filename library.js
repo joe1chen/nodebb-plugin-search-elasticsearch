@@ -35,7 +35,7 @@ var db = module.parent.require('./database'),
 		client: undefined
 	};
 
-Elasticsearch.init = function(app, middleware, controllers, callback) {
+Elasticsearch.init = function(data, callback) {
 	var pluginMiddleware = require('./middleware'),
 		render = function(req, res, next) {
 			// Regenerate csrf token
@@ -49,13 +49,13 @@ Elasticsearch.init = function(app, middleware, controllers, callback) {
 			});
 		};
 
-	app.get('/admin/plugins/elasticsearch', middleware.applyCSRF, middleware.admin.buildHeader, pluginMiddleware.ping, pluginMiddleware.getEnabled, pluginMiddleware.getStats, render);
-	app.get('/api/admin/plugins/elasticsearch', middleware.applyCSRF, pluginMiddleware.ping, pluginMiddleware.getEnabled, pluginMiddleware.getStats, render);
+	data.router.get('/admin/plugins/elasticsearch', data.middleware.applyCSRF, data.middleware.admin.buildHeader, pluginMiddleware.ping, pluginMiddleware.getEnabled, pluginMiddleware.getStats, render);
+	data.router.get('/api/admin/plugins/elasticsearch', data.middleware.applyCSRF, pluginMiddleware.ping, pluginMiddleware.getEnabled, pluginMiddleware.getStats, render);
 
 	// Utility
-	app.post('/admin/plugins/elasticsearch/rebuild', middleware.admin.isAdmin, Elasticsearch.rebuildIndex);
-	app.post('/admin/plugins/elasticsearch/toggle', Elasticsearch.toggle);
-	app.delete('/admin/plugins/elasticsearch/flush', middleware.admin.isAdmin, Elasticsearch.flush);
+	data.router.post('/admin/plugins/elasticsearch/rebuild', data.middleware.admin.isAdmin, Elasticsearch.rebuildIndex);
+	data.router.post('/admin/plugins/elasticsearch/toggle', Elasticsearch.toggle);
+	data.router.delete('/admin/plugins/elasticsearch/flush', data.middleware.admin.isAdmin, Elasticsearch.flush);
 
 	Elasticsearch.getSettings(Elasticsearch.connect);
 
@@ -342,7 +342,10 @@ Elasticsearch.topic.edit = function(topicObj) {
 		return;
 	}
 
-	Elasticsearch.indexPost(topicObj.mainPid, function(err, payload) {
+	async.waterfall([
+		async.apply(posts.getPostFields,topicObj.mainPid, ['pid', 'content']),
+			Elasticsearch.indexPost,
+		], function(err, payload) {
 		payload[Elasticsearch.config['titleField'] || 'title_t'] = topicObj.title;
 		Elasticsearch.add(payload);
 	});
@@ -351,36 +354,43 @@ Elasticsearch.topic.edit = function(topicObj) {
 /* Topic and Post indexing methods */
 
 Elasticsearch.indexTopic = function(topicObj, callback) {
-	topics.getPids(topicObj.tid, function(err, pids) {
-		if (err) {
-			return callback(err);
-		}
-		// Add OP to the list of pids to index
-		if (topicObj.mainPid) {
-			pids.unshift(topicObj.mainPid);
-		}
-
-		async.map(pids, Elasticsearch.indexPost, function(err, payload) {
-			if (err) {
-				winston.error('[plugin/elasticsearch] Encountered an error while compiling post data for tid ' + tid);
-				if (callback) callback(err);
-			} else {
-				// Also index the title into the main post of this topic
-				for(var x=0,numPids=payload.length;x<numPids;x++) {
-					if (payload[x].id === topicObj.mainPid) {
-						payload[x][Elasticsearch.config['titleField'] || 'title_t'] = topicObj.title;
-					}
-				}
-
-				if (typeof callback === 'function') {
-					callback(undefined, payload);
-				} else {
-					Elasticsearch.add(payload, callback);
-				}
+	async.waterfall([
+		async.apply(topics.getPids, topicObj.tid),
+		function(pids, next) {
+			// Add OP to the list of pids to index
+			if (topicObj.mainPid && pids.indexOf(topicObj.mainPid) === -1) {
+				pids.unshift(topicObj.mainPid);
 			}
-		});
+
+			posts.getPostsFields(pids, ['pid', 'content'], next);
+		},
+		function(posts, next) {
+			async.map(posts, Elasticsearch.indexPost, next);
+		}
+	], function(err, payload) {
+		if (err) {
+			winston.error('[plugins/elasticsearch] Encountered an error while compiling post data for tid ' + tid);
+
+			if (typeof callback === 'function') {
+				return callback(err);
+			}
+		}
+
+		// Also index the title into the main post of this topic
+		for(var x=0,numPids=payload.length;x<numPids;x++) {
+			if (payload[x].id === topicObj.mainPid) {
+				payload[x][Elasticsearch.config['titleField'] || 'title_t'] = topicObj.title;
+			}
+		}
+
+		if (typeof callback === 'function') {
+			callback(undefined, payload);
+		} else {
+			Elasticsearch.add(payload, callback);
+		}
 	});
 };
+
 
 Elasticsearch.deindexTopic = function(tid) {
 	async.parallel({
