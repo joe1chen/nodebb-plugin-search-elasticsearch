@@ -6,16 +6,11 @@
 		<form role="form" class="elasticsearch-settings">
 			<div class="form-group">
 				<label for="host">Host</label>
-				<input class="form-control" type="text" name="host" id="host" placeholder="Default: 127.0.0.1" />
+				<input class="form-control" type="text" name="host" id="host" placeholder="Default: 127.0.0.1:9200" />
 			</div>
 			<div class="form-group">
-				<label for="port">Port</label>
-				<input class="form-control" type="text" name="port" id="port" placeholder="Default: 8983" />
-			</div>
-
-			<div class="form-group">
-				<label for="index_name">Index Name</label>
-				<input class="form-control" type="text" name="index_name" id="index_name" />
+				<label for="posts_index_name">Posts Index Name</label>
+				<input class="form-control" type="text" name="posts_index_name" id="posts_index_name" />
 			</div>
 
 			<!--

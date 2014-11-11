@@ -6,6 +6,7 @@ var db = module.parent.require('./database'),
 	winston = module.parent.require('winston'),
 	elasticsearch = require('elasticsearch'),
 	async = module.parent.require('async'),
+	_ = module.parent.require('underscore'),
 
 	LRU = require('lru-cache'),
 	cache = LRU({ max: 20, maxAge: 1000 * 60 * 60 }),	// Remember the last 20 searches in the past hour
@@ -23,14 +24,14 @@ var db = module.parent.require('./database'),
 	Elasticsearch = {
 		/*
 			Defaults configs:
-			host: localhost
-			port: 9200
+			host: localhost:9200
 			enabled: undefined (false)
 		*/
 		config: {
 			sniffOnStart: true,             // Should the client attempt to detect the rest of the cluster when it is first instantiated?
 			sniffInterval: 60000,           // Every n milliseconds, perform a sniff operation and make sure our list of nodes is complete.
-			sniffOnConnectionFault: true    // Should the client immediately sniff for a more current list of nodes when a connection dies?
+			sniffOnConnectionFault: true,   // Should the client immediately sniff for a more current list of nodes when a connection dies?
+			host: 'localhost:9200'
 		},	// default is localhost:9200
 		client: undefined
 	};
@@ -107,8 +108,12 @@ Elasticsearch.getSettings = function(callback) {
 };
 
 Elasticsearch.getRecordCount = function(callback) {
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
+
 	Elasticsearch.client.count({
-		index: Elasticsearch.config.index_name
+		index: Elasticsearch.config.posts_index_name
 	}, function (error, response) {
 		if (!error && response) {
 			callback(null, response.count);
@@ -120,20 +125,36 @@ Elasticsearch.getRecordCount = function(callback) {
 };
 
 Elasticsearch.getTopicCount = function(callback) {
-	/*
-	var query = Elasticsearch.client.createQuery().q((Elasticsearch.config['titleField'] || 'title_t') + ':*').start(0).rows(0);
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
 
-	Elasticsearch.client.search(query, function(err, obj) {
-		if (!err && obj && obj.response) {
-			callback(undefined, obj.response.numFound);
-		} else {
-			callback(err, 0);
+	Elasticsearch.client.count({
+		index: Elasticsearch.config.posts_index_name,
+		body: {
+			filtered: {
+				filter: {
+					exists: {
+						field: "title"
+					}
+				}
+			}
+		}
+	}, function (error, response) {
+		if (!error && response) {
+			callback(null, response.count);
+		}
+		else {
+			callback(error, 0);
 		}
 	});
-	*/
 };
 
 Elasticsearch.connect = function() {
+	if (!Elasticsearch.config.host) {
+		return;
+	}
+
 	if (Elasticsearch.client) {
 		delete Elasticsearch.client;
 	}
@@ -171,24 +192,41 @@ Elasticsearch.search = function(data, callback) {
 	if (cache.has(data.query)) {
 		callback(null, cache.get(data.query));
 	} else {
-		var fields = {},
-			query;
 
-		// TODO
-		/*
-		// Populate Fields
-		fields[Elasticsearch.config['titleField'] || 'title_t'] = 1.5;
-		fields[Elasticsearch.config['contentField'] || 'description_t'] = 1;
+		if (!Elasticsearch.client) {
+			return callback(new Error('not-connected'));
+		}
 
-		query = Elasticsearch.client.createQuery().q(data.query).dismax().qf(fields).start(0).rows(20);
+		var query = {
+			body: {
+				query: {
+					dis_max: {
+						queries: [
+							{
+								match: {
+									content: escapeSpecialChars(data.query)
+								}
+							},
+							{
+								match: {
+									title: escapeSpecialChars(data.query)
+								}
+							}
+						]
+					}
+				},
+				from: 0,
+				size: 20
+			}
+		};
 
 		Elasticsearch.client.search(query, function(err, obj) {
 			if (err) {
 				callback(err);
 			} else if (obj && obj.response && obj.response.docs.length > 0) {
 				var payload = obj.response.docs.map(function(result) {
-						return result.id;
-					});
+					return result.id;
+				});
 
 				callback(null, payload);
 				cache.set(data.query, payload);
@@ -197,7 +235,6 @@ Elasticsearch.search = function(data, callback) {
 				cache.set(data.query, []);
 			}
 		});
-		*/
 	}
 };
 
@@ -209,18 +246,29 @@ Elasticsearch.searchTopic = function(data, callback) {
 		mainPid: async.apply(topics.getTopicField, tid, 'mainPid'),
 		pids: async.apply(topics.getPids, tid)
 	}, function(err, data) {
+
+		if (!Elasticsearch.client) {
+			return callback(new Error('not-connected'));
+		}
+
 		data.pids.unshift(data.mainPid);
 
-		var fields = {},
-			query;
-
-		// Populate Query
-
-		/*
-		fields[Elasticsearch.config.contentField || 'description_t'] = escapeSpecialChars(term);
-		fields.id = '(' + data.pids.join(' OR ') + ')';
-
-		query = Elasticsearch.client.createQuery().q(fields);
+		var query = {
+			body: {
+				filtered: {
+					query: {
+						match: {
+							content: escapeSpecialChars(term)
+						}
+					},
+					filter: {
+						ids: {
+							values: data.pids
+						}
+					}
+				}
+			}
+		};
 
 		Elasticsearch.client.search(query, function(err, obj) {
 			if (err) {
@@ -233,7 +281,6 @@ Elasticsearch.searchTopic = function(data, callback) {
 				callback(null, []);
 			}
 		});
-		*/
 	});
 };
 
@@ -249,17 +296,40 @@ Elasticsearch.toggle = function(req, res) {
 };
 
 Elasticsearch.add = function(payload, callback) {
-	Elasticsearch.client.add(payload, function(err, obj) {
+	if (!Elasticsearch.client) {
+		if (callback) {
+			return callback(new Error('not-connected'));
+		}
+		return;
+	}
+
+	if (!payload || 0 === payload.length) {
+		if (callback) {
+			return callback(null);
+		}
+		return;
+	}
+
+	Elasticsearch.client.index(payload, function(err, obj) {
 		if (err) {
 			winston.error('[plugin/elasticsearch] Could not index post ' + payload.id + ', error: ' + err.message);
 		} else if (typeof callback === 'function') {
+
+			// TODO - Where are arguments defined?
 			callback.apply(arguments);
 		}
 	});
 };
 
 Elasticsearch.remove = function(pid) {
-	Elasticsearch.client.delete('id', pid, function(err, obj) {
+	if (!Elasticsearch.client) {
+		return;
+	}
+
+	Elasticsearch.client.delete({
+		index: Elasticsearch.config.posts_index_name,
+		id: pid
+	}, function(err, obj) {
 		if (err) {
 			winston.error('[plugin/elasticsearch] Could not remove post ' + pid + ' from index');
 		}
@@ -267,7 +337,14 @@ Elasticsearch.remove = function(pid) {
 };
 
 Elasticsearch.flush = function(req, res) {
-	Elasticsearch.client.delete('id', '*', function(err, obj){
+	if (!Elasticsearch.client) {
+		return;
+	}
+
+	Elasticsearch.client.deleteByQuery({
+		index: Elasticsearch.config.posts_index_name,
+		q: '*'
+	}, function(err, obj){
 		if (err) {
 			winston.error('[plugin/elasticsearch] Could not empty the search index');
 			res.send(500, err.message);
@@ -346,7 +423,7 @@ Elasticsearch.topic.edit = function(topicObj) {
 		async.apply(posts.getPostFields,topicObj.mainPid, ['pid', 'content']),
 			Elasticsearch.indexPost,
 		], function(err, payload) {
-		payload[Elasticsearch.config['titleField'] || 'title_t'] = topicObj.title;
+		payload.title = topicObj.title;
 		Elasticsearch.add(payload);
 	});
 };
@@ -369,7 +446,7 @@ Elasticsearch.indexTopic = function(topicObj, callback) {
 		}
 	], function(err, payload) {
 		if (err) {
-			winston.error('[plugins/elasticsearch] Encountered an error while compiling post data for tid ' + tid);
+			winston.error('[plugins/elasticsearch] Encountered an error while compiling post data for tid ' + topicObj.tid);
 
 			if (typeof callback === 'function') {
 				return callback(err);
@@ -379,11 +456,12 @@ Elasticsearch.indexTopic = function(topicObj, callback) {
 		// Also index the title into the main post of this topic
 		for(var x=0,numPids=payload.length;x<numPids;x++) {
 			if (payload[x].id === topicObj.mainPid) {
-				payload[x][Elasticsearch.config['titleField'] || 'title_t'] = topicObj.title;
+				payload[x].title = topicObj.title;
 			}
 		}
 
 		if (typeof callback === 'function') {
+			// If callback is defined, then we don't index, but rather return the payload?!
 			callback(undefined, payload);
 		} else {
 			Elasticsearch.add(payload, callback);
@@ -397,7 +475,13 @@ Elasticsearch.deindexTopic = function(tid) {
 		mainPid: async.apply(topics.getTopicField, tid, 'mainPid'),
 		pids: async.apply(topics.getPids, tid)
 	}, function(err, data) {
-		data.pids.unshift(data.mainPid);
+
+		if (!Elasticsearch.client) {
+			return;
+		}
+
+		// TODO Review this.. We should also deindex main pid post??
+		//data.pids.unshift(data.mainPid);
 		var query = 'id:(' + data.pids.join(' OR ') + ')';
 		Elasticsearch.client.deleteByQuery(query, function(err, obj) {
 			if (err) {
@@ -409,41 +493,109 @@ Elasticsearch.deindexTopic = function(tid) {
 
 Elasticsearch.indexPost = function(postData, callback) {
 	var payload = {
-			id: postData.pid
-		};
+		id: postData.pid
+	};
 
-	
-	payload[Elasticsearch.config['contentField'] || 'description_t'] = postData.content;
+	payload.content = postData.content;
 
 	if (typeof callback === 'function') {
 		callback(undefined, payload);
 	} else {
 		Elasticsearch.add(payload);
 	}
-	
 };
 
 Elasticsearch.deindexPost = Elasticsearch.post.delete;
 
 Elasticsearch.rebuildIndex = function(req, res) {
-	db.getSortedSetRange('topics:tid', 0, -1, function(err, tids) {
-		if (err) {
-			winston.error('[plugin/elasticsearch] Could not retrieve topic listing for indexing');
-		} else {
-			async.map(tids, Elasticsearch.indexTopic, function(err, topicPayloads) {
-				var payload = [];
-				for(var x=0,numTopics=topicPayloads.length;x<numTopics;x++) {
-					payload = payload.concat(topicPayloads[x]);
-				}
 
-				Elasticsearch.add(payload, function(err, obj) {
-					if (!err) {
-						res.send(200);
-					}
-				});
-			});
+	async.series([
+		Elasticsearch.deleteIndex,
+		Elasticsearch.createIndex
+	],
+	function(err, results){
+		if (err) {
+			return winston.error('[plugin/elasticsearch] Could not delete and re-create index');
+			// TODO: Do we need to send response?
 		}
+
+		db.getSortedSetRange('topics:tid', 0, -1, function(err, tids) {
+			if (err) {
+				winston.error('[plugin/elasticsearch] Could not retrieve topic listing for indexing');
+			} else {
+				async.map(tids, Elasticsearch.indexTopic, function(err, topicPayloads) {
+					var payload = [];
+					for(var x=0,numTopics=topicPayloads.length;x<numTopics;x++) {
+						payload = payload.concat(topicPayloads[x]);
+					}
+
+					Elasticsearch.add(payload, function(err, obj) {
+						if (!err) {
+							res.send(200);
+						}
+					});
+				});
+			}
+		});
 	});
+};
+
+Elasticsearch.createIndex = function(callback) {
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
+
+	var indexName = Elasticsearch.config.posts_index_name;
+	if (indexName && 0 < indexName.length) {
+		Elasticsearch.client.indices.create({
+			index : Elasticsearch.config.posts_index_name,
+			body: {
+				mappings: {
+					posts: {
+						properties : {
+							content : { type : "string" }, // Post content
+							title : { type : "string" } // Topic title
+						}
+					}
+				}
+			}
+		}, function(err, results){
+			if (!err) {
+				callback(null, results);
+			}
+			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
+				winston.error("[plugin/elasticsearch] Ignoring error creating mapping " + err);
+				callback(null);
+			}
+			else {
+				callback(err);
+			}
+		});
+	}
+};
+
+Elasticsearch.deleteIndex = function(callback) {
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
+
+	var indexName = Elasticsearch.config.posts_index_name;
+	if (indexName && 0 < indexName.length) {
+		Elasticsearch.client.indices.delete({
+			index : Elasticsearch.config.posts_index_name
+		}, function(err, results) {
+			if (!err) {
+				callback(null, results);
+			}
+			else if ( /IndexMissingException/im.test(err.message) ) { // we can ignore if index is not there
+				winston.error("[plugin/elasticsearch] Ignoring error deleting mapping " + err);
+				callback(null);
+			}
+			else {
+				callback(err);
+			}
+		});
+	}
 };
 
 module.exports = Elasticsearch;
