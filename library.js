@@ -310,12 +310,51 @@ Elasticsearch.add = function(payload, callback) {
 		return;
 	}
 
-	Elasticsearch.client.index(payload, function(err, obj) {
-		if (err) {
-			winston.error('[plugin/elasticsearch] Could not index post ' + payload.id + ', error: ' + err.message);
-		} else if (typeof callback === 'function') {
+	// Create bulk document, which looks like this:
+	/*
+	[
+	 // action description
+	 { index:  { _index: 'myindex', _type: 'mytype', _id: 1 } },
+	 // the document to index
+	 { title: 'foo' },
+	 // action description
+	 { update: { _index: 'myindex', _type: 'mytype', _id: 2 } },
+	 // the document to update
+	 { doc: { title: 'foo' } },
+	 // action description
+	 { delete: { _index: 'myindex', _type: 'mytype', _id: 3 } },
+	 // no document needed for this delete
+	]
+	*/
 
-			// TODO - Where are arguments defined?
+	var body = [];
+	_.each(payload, function(item) {
+		// Action
+		body.push({
+			index: {
+				/*_index: Elasticsearch.config.posts_index_name, */ // We'll set it in bulk()
+				/*_type: 'posts', */ // We'll set it in bulk()
+				_id: item.id
+			}
+		});
+
+		// Document
+		body.push(item);
+	});
+
+	Elasticsearch.client.bulk({
+		body: body,
+		type: 'posts',
+		index: Elasticsearch.config.posts_index_name
+	}, function(err, obj) {
+		if (err) {
+			if (payload.id) {
+				winston.error('[plugin/elasticsearch] Could not index post ' + payload.id + ', error: ' + err.message);
+			}
+			else {
+				winston.error('[plugin/elasticsearch] Could not index posts, error: ' + err.message);
+			}
+		} else if (typeof callback === 'function') {
 			callback.apply(arguments);
 		}
 	});
@@ -420,7 +459,7 @@ Elasticsearch.topic.edit = function(topicObj) {
 	}
 
 	async.waterfall([
-		async.apply(posts.getPostFields,topicObj.mainPid, ['pid', 'content']),
+			async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
 			Elasticsearch.indexPost,
 		], function(err, payload) {
 		payload.title = topicObj.title;
@@ -480,8 +519,7 @@ Elasticsearch.deindexTopic = function(tid) {
 			return;
 		}
 
-		// TODO Review this.. We should also deindex main pid post??
-		//data.pids.unshift(data.mainPid);
+		data.pids.unshift(data.mainPid);
 		var query = 'id:(' + data.pids.join(' OR ') + ')';
 		Elasticsearch.client.deleteByQuery(query, function(err, obj) {
 			if (err) {
@@ -492,6 +530,10 @@ Elasticsearch.deindexTopic = function(tid) {
 };
 
 Elasticsearch.indexPost = function(postData, callback) {
+	if (!postData || !postData.pid || !postData.content) {
+		return callback(null);
+	}
+
 	var payload = {
 		id: postData.pid
 	};
@@ -515,27 +557,39 @@ Elasticsearch.rebuildIndex = function(req, res) {
 	],
 	function(err, results){
 		if (err) {
-			return winston.error('[plugin/elasticsearch] Could not delete and re-create index');
-			// TODO: Do we need to send response?
+			// TODO review this
+			winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
+			res.sendStatus(500);
+			return
 		}
 
-		db.getSortedSetRange('topics:tid', 0, -1, function(err, tids) {
-			if (err) {
-				winston.error('[plugin/elasticsearch] Could not retrieve topic listing for indexing');
-			} else {
-				async.map(tids, Elasticsearch.indexTopic, function(err, topicPayloads) {
-					var payload = [];
-					for(var x=0,numTopics=topicPayloads.length;x<numTopics;x++) {
-						payload = payload.concat(topicPayloads[x]);
-					}
-
-					Elasticsearch.add(payload, function(err, obj) {
-						if (!err) {
-							res.send(200);
-						}
-					});
-				});
+		async.waterfall([
+			async.apply(db.getSortedSetRange, 'topics:tid', 0, -1),
+			function(tids, next) {
+				topics.getTopicsFields(tids, ['tid', 'mainPid', 'title'], next);
 			}
+		], function(err, topics) {
+			if (err) {
+				return winston.error('[plugins/elasticsearch] Could not retrieve topic listing for indexing. Error: ' + err.message);
+			}
+
+			async.map(topics, Elasticsearch.indexTopic, function(err, topicPayloads) {
+				var payload = topicPayloads.reduce(function(currentPayload, topics) {
+					if (Array.isArray(topics)) {
+						return currentPayload.concat(topics);
+					} else {
+						currentPayload.push(topics);
+					}
+				}, []).filter(function(entry) {
+					return entry.hasOwnProperty('id');
+				});
+
+				Elasticsearch.add(payload, function(err, obj) {
+					if (!err) {
+						res.sendStatus(200);
+					}
+				});
+			});
 		});
 	});
 };
