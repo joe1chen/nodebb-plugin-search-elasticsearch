@@ -401,8 +401,8 @@ Elasticsearch.add = function(payload, callback) {
 		index: Elasticsearch.config.posts_index_name
 	}, function(err, obj) {
 		if (err) {
-			if (payload.id) {
-				winston.error('[plugin/elasticsearch] Could not index post ' + payload.id + ', error: ' + err.message);
+			if (payload.length === 1) {
+				winston.error('[plugin/elasticsearch] Could not index post ' + payload[0].id + ', error: ' + err.message);
 			}
 			else {
 				winston.error('[plugin/elasticsearch] Could not index posts, error: ' + err.message);
