@@ -129,15 +129,20 @@ Elasticsearch.getTopicCount = function(callback) {
 		return callback(new Error('not-connected'));
 	}
 
-	// TODO
 	Elasticsearch.client.count({
-		index: Elasticsearch.config.posts_index_name/*,
+		index: Elasticsearch.config.posts_index_name,
 		type: 'posts',
 		body: {
-			exists: {
-				field: "title"
+			query: {
+				constant_score: {
+					filter: {
+						exists: {
+							field: "title"
+						}
+					}
+				}
 			}
-		}*/
+		}
 	}, function (error, response) {
 		if (!error && response) {
 			callback(null, response.count);
@@ -638,7 +643,6 @@ Elasticsearch.rebuildIndex = function(req, res) {
 	],
 	function(err, results){
 		if (err) {
-			// TODO review this
 			winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
 			res.sendStatus(500);
 			return
@@ -699,7 +703,7 @@ Elasticsearch.createIndex = function(callback) {
 				callback(null, results);
 			}
 			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
-				winston.error("[plugin/elasticsearch] Ignoring error creating mapping " + err);
+				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
 				callback(null);
 			}
 			else {
@@ -723,7 +727,7 @@ Elasticsearch.deleteIndex = function(callback) {
 				callback(null, results);
 			}
 			else if ( /IndexMissingException/im.test(err.message) ) { // we can ignore if index is not there
-				winston.error("[plugin/elasticsearch] Ignoring error deleting mapping " + err);
+				winston.info("[plugin/elasticsearch] Ignoring error deleting mapping " + err);
 				callback(null);
 			}
 			else {
