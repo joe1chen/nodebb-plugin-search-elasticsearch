@@ -264,6 +264,20 @@ Elasticsearch.searchTopic = function(data, callback) {
 		var query = {
 			body: {
 				query: {
+					filtered: {
+						query: {
+							match: {
+								content: escapeSpecialChars(term)
+							}
+						},
+						filter: {
+							ids: {
+								type: 'posts',
+								values: data.pids
+							}
+						}
+					}
+					/*
 					dis_max: {
 						queries: [
 							{
@@ -278,7 +292,7 @@ Elasticsearch.searchTopic = function(data, callback) {
 								}
 							}
 						]
-					}
+					}*/
 				},
 				from: 0,
 				size: 20
