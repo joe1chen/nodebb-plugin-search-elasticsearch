@@ -1,8 +1,8 @@
 {
-	"id": "nodebb-plugin-search-es",
+	"id": "nodebb-plugin-search-elasticsearch",
 	"name": "Elasticsearch Search",
 	"description": "Full-text searching using Elasticsearch",
-	"url": "https://github.com/joe1chen/nodebb-plugin-search-es",
+	"url": "https://github.com/joe1chen/nodebb-plugin-search-elasticsearch",
 	"library": "./library.js",
 	"hooks": [
 		{ "hook": "static:app.load", "method": "init", "priority": 5 },
