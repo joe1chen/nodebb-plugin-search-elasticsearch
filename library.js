@@ -249,22 +249,31 @@ Elasticsearch.searchTopic = function(data, callback) {
 			return callback(new Error('not-connected'));
 		}
 
-		data.pids.unshift(data.mainPid);
+		if (data.mainPid && data.pids.indexOf(data.mainPid) === -1) {
+			data.pids.unshift(data.mainPid);
+		}
 
 		var query = {
 			body: {
-				filtered: {
-					query: {
-						match: {
-							content: escapeSpecialChars(term)
-						}
-					},
-					filter: {
-						ids: {
-							values: data.pids
-						}
+				query: {
+					dis_max: {
+						queries: [
+							{
+								ids: {
+									type: 'posts',
+									values: data.pids
+								}
+							},
+							{
+								match: {
+									title: escapeSpecialChars(term)
+								}
+							}
+						]
 					}
-				}
+				},
+				from: 0,
+				size: 20
 			}
 		};
 
@@ -301,11 +310,24 @@ Elasticsearch.add = function(payload, callback) {
 		return;
 	}
 
-	if (!payload || 0 === payload.length) {
+	if (!payload) {
 		if (callback) {
 			return callback(null);
 		}
 		return;
+	}
+
+	if (_.isArray(payload)) {
+		if (0 === payload.length) {
+			if (callback) {
+				return callback(null);
+			}
+			return;
+		}
+	}
+	else {
+		// If not array, then make it a single-element array because bulk method requires array.
+		payload = [ payload ];
 	}
 
 	// Create bulk document, which looks like this:
@@ -358,17 +380,22 @@ Elasticsearch.add = function(payload, callback) {
 	});
 };
 
-Elasticsearch.remove = function(pid) {
+Elasticsearch.remove = function(pid, callback) {
 	if (!Elasticsearch.client) {
 		return;
 	}
 
 	Elasticsearch.client.delete({
 		index: Elasticsearch.config.posts_index_name,
+		type: 'posts',
 		id: pid
 	}, function(err, obj) {
 		if (err) {
 			winston.error('[plugin/elasticsearch] Could not remove post ' + pid + ' from index');
+		}
+
+		if (callback) {
+			callback(null, obj);
 		}
 	});
 };
@@ -380,6 +407,7 @@ Elasticsearch.flush = function(req, res) {
 
 	Elasticsearch.client.deleteByQuery({
 		index: Elasticsearch.config.posts_index_name,
+		type: 'posts',
 		q: '*'
 	}, function(err, obj){
 		if (err) {
@@ -457,9 +485,9 @@ Elasticsearch.topic.edit = function(topicObj) {
 	}
 
 	async.waterfall([
-			async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
-			Elasticsearch.indexPost,
-		], function(err, payload) {
+		async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
+		Elasticsearch.indexPost,
+	], function(err, payload) {
 		payload.title = topicObj.title;
 		Elasticsearch.add(payload);
 	});
@@ -517,13 +545,39 @@ Elasticsearch.deindexTopic = function(tid) {
 			return;
 		}
 
-		data.pids.unshift(data.mainPid);
-		var query = 'id:(' + data.pids.join(' OR ') + ')';
+		if (data.mainPid && data.pids.indexOf(data.mainPid) === -1) {
+			data.pids.unshift(data.mainPid);
+		}
+
+		/*
+		var query = {
+			index: Elasticsearch.config.posts_index_name,
+			type: 'posts',
+			body: {
+				terms: {
+					_ids: data.pids
+				}
+			}
+		};
 		Elasticsearch.client.deleteByQuery(query, function(err, obj) {
 			if (err) {
 				winston.error('[plugin/elasticsearch] Encountered an error while deindexing tid ' + tid);
 			}
 		});
+		*/
+
+		async.each(data.pids, function(pid, callback) {
+			if (_.isString(pid)) {
+				pid = parseInt(pid, 10);
+			}
+
+			Elasticsearch.remove(pid, callback);
+		}, function(err){
+			if (err) {
+				winston.error('[plugin/elasticsearch] Encountered an error while deindexing tid ' + tid + '. Error: ' + err.message);
+			}
+		});
+
 	});
 };
 
