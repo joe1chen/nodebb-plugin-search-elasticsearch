@@ -76,7 +76,7 @@ Elasticsearch.ping = function(callback) {
 };
 
 Elasticsearch.checkConflict = function() {
-	if (module.parent.exports.libraries['nodebb-plugin-dbsearch']) {
+	if (module.parent.exports.libraries['nodebb-plugin-dbsearch'] || module.parent.exports.libraries['nodebb-plugin-solr']) {
 		return true;
 	} else {
 		return false;
@@ -198,7 +198,7 @@ Elasticsearch.adminMenu = function(custom_header, callback) {
 Elasticsearch.search = function(data, callback) {
 	if (Elasticsearch.checkConflict()) {
 		// The dbsearch plugin was detected, abort search!
-		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch) is enabled, so search via Elasticsearch was aborted.');
+		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
 	} else if (data.index === 'topic') {
 		// We are only using the "post" index, because Elasticsearch does its own relevency sorting
