@@ -253,6 +253,14 @@ Elasticsearch.searchTopic = function(data, callback) {
 			data.pids.unshift(data.mainPid);
 		}
 
+		// Make sure ids are integers
+		data.pids = _.map(data.pids, function(p) {
+			if (_.isString(p)) {
+				return parseInt(p, 10);
+			}
+			return p;
+		});
+
 		var query = {
 			body: {
 				query: {
@@ -349,6 +357,12 @@ Elasticsearch.add = function(payload, callback) {
 
 	var body = [];
 	_.each(payload, function(item) {
+
+		// Make sure id is an integer
+		if (_.isString(item.id)) {
+			item.id = parseInt(item.id, 10);
+		}
+
 		// Action
 		body.push({
 			index: {
@@ -383,6 +397,11 @@ Elasticsearch.add = function(payload, callback) {
 Elasticsearch.remove = function(pid, callback) {
 	if (!Elasticsearch.client) {
 		return;
+	}
+
+	// Make sure id is an integer
+	if (_.isString(pid)) {
+		pid = parseInt(pid, 10);
 	}
 
 	Elasticsearch.client.delete({
@@ -567,10 +586,6 @@ Elasticsearch.deindexTopic = function(tid) {
 		*/
 
 		async.each(data.pids, function(pid, callback) {
-			if (_.isString(pid)) {
-				pid = parseInt(pid, 10);
-			}
-
 			Elasticsearch.remove(pid, callback);
 		}, function(err){
 			if (err) {
