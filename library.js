@@ -31,7 +31,9 @@ var db = module.parent.require('./database'),
 			sniffOnStart: true,             // Should the client attempt to detect the rest of the cluster when it is first instantiated?
 			sniffInterval: 60000,           // Every n milliseconds, perform a sniff operation and make sure our list of nodes is complete.
 			sniffOnConnectionFault: true,   // Should the client immediately sniff for a more current list of nodes when a connection dies?
-			host: 'localhost:9200'
+			host: 'localhost:9200',
+			index_name: 'nodebb',
+			post_type: 'posts'
 		},	// default is localhost:9200
 		client: undefined
 	};
@@ -113,7 +115,7 @@ Elasticsearch.getRecordCount = function(callback) {
 	}
 
 	Elasticsearch.client.count({
-		index: Elasticsearch.config.posts_index_name
+		index: Elasticsearch.config.index_name
 	}, function (error, response) {
 		if (!error && response) {
 			callback(null, response.count);
@@ -130,8 +132,8 @@ Elasticsearch.getTopicCount = function(callback) {
 	}
 
 	Elasticsearch.client.count({
-		index: Elasticsearch.config.posts_index_name,
-		type: 'posts',
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
 		body: {
 			query: {
 				constant_score: {
@@ -277,7 +279,7 @@ Elasticsearch.searchTopic = function(data, callback) {
 						},
 						filter: {
 							ids: {
-								type: 'posts',
+								type: Elasticsearch.config.post_type,
 								values: data.pids
 							}
 						}
@@ -287,7 +289,7 @@ Elasticsearch.searchTopic = function(data, callback) {
 						queries: [
 							{
 								ids: {
-									type: 'posts',
+									type: Elasticsearch.config.post_type,
 									values: data.pids
 								}
 							},
@@ -385,8 +387,8 @@ Elasticsearch.add = function(payload, callback) {
 		// Action
 		body.push({
 			index: {
-				/*_index: Elasticsearch.config.posts_index_name, */ // We'll set it in bulk()
-				/*_type: 'posts', */ // We'll set it in bulk()
+				/*_index: Elasticsearch.config.index_name, */ // We'll set it in bulk()
+				/*_type: Elasticsearch.config.post_type, */ // We'll set it in bulk()
 				_id: item.id
 			}
 		});
@@ -397,8 +399,8 @@ Elasticsearch.add = function(payload, callback) {
 
 	Elasticsearch.client.bulk({
 		body: body,
-		type: 'posts',
-		index: Elasticsearch.config.posts_index_name
+		type: Elasticsearch.config.post_type,
+		index: Elasticsearch.config.index_name
 	}, function(err, obj) {
 		if (err) {
 			if (payload.length === 1) {
@@ -424,8 +426,8 @@ Elasticsearch.remove = function(pid, callback) {
 	}
 
 	Elasticsearch.client.delete({
-		index: Elasticsearch.config.posts_index_name,
-		type: 'posts',
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
 		id: pid
 	}, function(err, obj) {
 		if (err) {
@@ -444,8 +446,8 @@ Elasticsearch.flush = function(req, res) {
 	}
 
 	Elasticsearch.client.deleteByQuery({
-		index: Elasticsearch.config.posts_index_name,
-		type: 'posts',
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
 		q: '*'
 	}, function(err, obj){
 		if (err) {
@@ -596,8 +598,8 @@ Elasticsearch.deindexTopic = function(tid) {
 		});
 
 		var query = {
-			index: Elasticsearch.config.posts_index_name,
-			type: 'posts',
+			index: Elasticsearch.config.index_name,
+			type: Elasticsearch.config.post_type,
 			body: {
 				query: {
 					ids: {
@@ -684,10 +686,10 @@ Elasticsearch.createIndex = function(callback) {
 		return callback(new Error('not-connected'));
 	}
 
-	var indexName = Elasticsearch.config.posts_index_name;
+	var indexName = Elasticsearch.config.index_name;
 	if (indexName && 0 < indexName.length) {
 		Elasticsearch.client.indices.create({
-			index : Elasticsearch.config.posts_index_name,
+			index : Elasticsearch.config.index_name,
 			body: {
 				mappings: {
 					posts: {
@@ -718,10 +720,10 @@ Elasticsearch.deleteIndex = function(callback) {
 		return callback(new Error('not-connected'));
 	}
 
-	var indexName = Elasticsearch.config.posts_index_name;
+	var indexName = Elasticsearch.config.index_name;
 	if (indexName && 0 < indexName.length) {
 		Elasticsearch.client.indices.delete({
-			index : Elasticsearch.config.posts_index_name
+			index : Elasticsearch.config.index_name
 		}, function(err, results) {
 			if (!err) {
 				callback(null, results);

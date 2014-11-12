@@ -8,9 +8,15 @@
 				<label for="host">Host</label>
 				<input class="form-control" type="text" name="host" id="host" placeholder="Default: 127.0.0.1:9200" />
 			</div>
+
+			<h4>Indexing Settings</h4>
 			<div class="form-group">
-				<label for="posts_index_name">Posts Index Name</label>
-				<input class="form-control" type="text" name="posts_index_name" id="posts_index_name" />
+				<label for="index_name">Index Name</label>
+				<input class="form-control" type="text" name="index_name" id="index_name" placeholder="Default: nodebb"/>
+			</div>
+			<div class="form-group">
+				<label for="post_type">Post Type</label>
+				<input class="form-control" type="text" name="post_type" id="post_type" placeholder="Default: posts" />
 			</div>
 
 			<!--
