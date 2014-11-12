@@ -587,26 +587,26 @@ Elasticsearch.deindexTopic = function(tid) {
 			data.pids.unshift(data.mainPid);
 		}
 
-		/*
+		// Make sure ids are integers
+		data.pids = _.map(data.pids, function(p) {
+			if (_.isString(p)) {
+				return parseInt(p, 10);
+			}
+			return p;
+		});
+
 		var query = {
 			index: Elasticsearch.config.posts_index_name,
 			type: 'posts',
 			body: {
-				terms: {
-					_ids: data.pids
+				query: {
+					ids: {
+						values: data.pids
+					}
 				}
 			}
 		};
 		Elasticsearch.client.deleteByQuery(query, function(err, obj) {
-			if (err) {
-				winston.error('[plugin/elasticsearch] Encountered an error while deindexing tid ' + tid);
-			}
-		});
-		*/
-
-		async.each(data.pids, function(pid, callback) {
-			Elasticsearch.remove(pid, callback);
-		}, function(err){
 			if (err) {
 				winston.error('[plugin/elasticsearch] Encountered an error while deindexing tid ' + tid + '. Error: ' + err.message);
 			}
