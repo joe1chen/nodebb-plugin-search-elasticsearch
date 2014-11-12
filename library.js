@@ -38,6 +38,9 @@ var db = module.parent.require('./database'),
 		client: undefined
 	};
 
+_.str = require('underscore.string'); // Import Underscore.string to separate object, because there are conflict functions (include, reverse, contains)
+_.mixin(_.str.exports()); // Mix in non-conflict functions to Underscore namespace if you want
+
 Elasticsearch.init = function(data, callback) {
 	var pluginMiddleware = require('./middleware'),
 		render = function(req, res, next) {
@@ -164,14 +167,23 @@ Elasticsearch.connect = function() {
 		delete Elasticsearch.client;
 	}
 
-	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
+	// Convert host to array
+	var hosts = Elasticsearch.config.host.split(',');
+	hosts = _.map(hosts, function(host){ return _.trim(host); });
 
-	//TODO Basic Auth
-	/*
-	if (Elasticsearch.config.username && Elasticsearch.config.password) {
-		Elasticsearch.client.basicAuth(Elasticsearch.config.username, Elasticsearch.config.password);
+	// Compact array to remove empty elements just in case.
+	hosts = _.compact(hosts);
+
+	if (hosts.length === 0) {
+		return;
 	}
-	*/
+
+	Elasticsearch.config.hosts = hosts;
+
+	// Now remove the host since we're going to use hosts.
+	delete Elasticsearch.config.host;
+
+	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
 };
 
 Elasticsearch.adminMenu = function(custom_header, callback) {

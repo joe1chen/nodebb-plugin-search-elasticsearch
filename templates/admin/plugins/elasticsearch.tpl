@@ -7,6 +7,23 @@
 			<div class="form-group">
 				<label for="host">Host</label>
 				<input class="form-control" type="text" name="host" id="host" placeholder="Default: 127.0.0.1:9200" />
+				<p class="help-block">
+					Host can be:
+					<ul>
+						<li>Single host:port
+							<pre>localhost:9200</pre>
+						</li>
+						<li>Multiple comma separate host:port pairs
+							<pre>host1:9200,host2:9200</pre>
+						</li>
+						<li>Multiple full urls separated by comma
+							<pre>http://host1:9200,http://host2:9200</pre>
+						</li>
+						<li>Multiple full urls (with basic auth credentials) separated by comma
+							<pre>https://user:pass@host1:9200,https://user:pass@host2:9200</pre>
+						</li>
+					</ul>
+				</p>
 			</div>
 
 			<h4>Indexing Settings</h4>
@@ -18,40 +35,6 @@
 				<label for="post_type">Post Type</label>
 				<input class="form-control" type="text" name="post_type" id="post_type" placeholder="Default: posts" />
 			</div>
-
-			<!--
-			<h4>Authentication</h4>
-			<p class="help-block">
-				If your Elasticsearch server is configured with HTTP Basic Authentication, enter its credentials here.
-				Leave it blank otherwise.
-			</p>
-			<div class="form-group col-sm-6">
-				<label for="username">Username</label>
-				<input class="form-control" type="text" name="username" id="username" />
-			</div>
-			<div class="form-group col-sm-6">
-				<label for="password">Password</label>
-				<input class="form-control" type="password" name="password" id="password" />
-			</div>
-			-->
-
-			<!--
-			<h4>Custom Fields</h4>
-			<div class="row">
-				<div class="form-group col-xs-6">
-					<label for="titleField">Title Field</label>
-					<input class="form-control" type="text" placeholder="Default: title_t" id="titleField" name="titleField" />
-				</div>
-				<div class="form-group col-xs-6">
-					<label for="contentField">Content Field</label>
-					<input class="form-control" type="text" placeholder="Default: description_t" id="contentField" name="contentField" />
-				</div>
-				<p class="help-block col-xs-12">
-					If you have specified your own field schema in your Elasticsearch <code>schema.xml</code>
-					file, you an specify the custom fields here.
-				</p>
-			</div>
-			-->
 
 			<button id="save" type="button" class="btn btn-primary btn-block">Save</button>
 		</form>
