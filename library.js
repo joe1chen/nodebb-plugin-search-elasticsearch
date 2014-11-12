@@ -14,7 +14,6 @@ var db = module.parent.require('./database'),
 	topics = module.parent.require('./topics'),
 	posts = module.parent.require('./posts'),
 
-	// This method is necessary until solr-client 0.3.x is released
 	escapeSpecialChars = function(s) {
 		return s.replace(/([\+\-&\|!\(\)\{\}\[\]\^"~\*\?:\\\ ])/g, function(match) {
 			return '\\' + match;
@@ -296,22 +295,6 @@ Elasticsearch.searchTopic = function(data, callback) {
 							}
 						}
 					}
-					/*
-					dis_max: {
-						queries: [
-							{
-								ids: {
-									type: Elasticsearch.config.post_type,
-									values: data.pids
-								}
-							},
-							{
-								match: {
-									title: escapeSpecialChars(term)
-								}
-							}
-						]
-					}*/
 				},
 				from: 0,
 				size: 20
