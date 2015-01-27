@@ -258,6 +258,10 @@ Elasticsearch.searchTopic = function(data, callback) {
 	var tid = data.tid,
 		term = data.term;
 
+	if (!term || !term.length) {
+		return callback(null, []);
+	}
+
 	async.parallel({
 		mainPid: async.apply(topics.getTopicField, tid, 'mainPid'),
 		pids: async.apply(topics.getPids, tid)
