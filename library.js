@@ -241,7 +241,7 @@ Elasticsearch.search = function(data, callback) {
 				callback(err);
 			} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
 				var payload = obj.hits.hits.map(function(result) {
-					return result._id;
+					return parseInt(result._id, 10);
 				});
 
 				callback(null, payload);
@@ -376,16 +376,15 @@ Elasticsearch.add = function(payload, callback) {
 
 		if (item && item.id) {
 			// Make sure id is an integer
-			if (_.isString(item.id)) {
-				item.id = parseInt(item.id, 10);
-			}
+			var itemId = parseInt(item.id, 10);
+			item.id = itemId;
 
 			// Action
 			body.push({
 				index: {
 					/*_index: Elasticsearch.config.index_name, */ // We'll set it in bulk()
 					/*_type: Elasticsearch.config.post_type, */ // We'll set it in bulk()
-					_id: item.id
+					_id: itemId
 				}
 			});
 
