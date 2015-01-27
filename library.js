@@ -374,23 +374,32 @@ Elasticsearch.add = function(payload, callback) {
 	var body = [];
 	_.each(payload, function(item) {
 
-		// Make sure id is an integer
-		if (_.isString(item.id)) {
-			item.id = parseInt(item.id, 10);
-		}
-
-		// Action
-		body.push({
-			index: {
-				/*_index: Elasticsearch.config.index_name, */ // We'll set it in bulk()
-				/*_type: Elasticsearch.config.post_type, */ // We'll set it in bulk()
-				_id: item.id
+		if (item && item.id) {
+			// Make sure id is an integer
+			if (_.isString(item.id)) {
+				item.id = parseInt(item.id, 10);
 			}
-		});
 
-		// Document
-		body.push(item);
+			// Action
+			body.push({
+				index: {
+					/*_index: Elasticsearch.config.index_name, */ // We'll set it in bulk()
+					/*_type: Elasticsearch.config.post_type, */ // We'll set it in bulk()
+					_id: item.id
+				}
+			});
+
+			// Document
+			body.push(item);
+		}
 	});
+
+	if (0 === body.length) {
+		if (callback) {
+			return callback(null);
+		}
+		return;
+	}
 
 	Elasticsearch.client.bulk({
 		body: body,
@@ -555,8 +564,10 @@ Elasticsearch.indexTopic = function(topicObj, callback) {
 
 		// Also index the title into the main post of this topic
 		for(var x=0,numPids=payload.length;x<numPids;x++) {
-			if (payload[x].id === topicObj.mainPid) {
-				payload[x].title = topicObj.title;
+			if (payload[x]) {
+				if (payload[x].id === topicObj.mainPid) {
+					payload[x].title = topicObj.title;
+				}
 			}
 		}
 
