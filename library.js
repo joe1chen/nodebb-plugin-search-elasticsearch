@@ -674,7 +674,10 @@ Elasticsearch.rebuildIndex = function(req, res) {
 						currentPayload.push(topics);
 					}
 				}, []).filter(function(entry) {
-					return entry.hasOwnProperty('id');
+					if (entry) {
+						return entry.hasOwnProperty('id');
+					}
+					return false;
 				});
 
 				Elasticsearch.add(payload, function(err, obj) {
