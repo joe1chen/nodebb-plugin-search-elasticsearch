@@ -535,6 +535,13 @@ Elasticsearch.topic.edit = function(topicObj) {
 		async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
 		Elasticsearch.indexPost,
 	], function(err, payload) {
+		if (err) {
+			return winston.error(err.message);
+		}
+		if (!payload) {
+			return winston.warn('[plugins/elasticsearch] no payload for pid ' + topicObj.mainPid);
+		}
+
 		payload.title = topicObj.title;
 		Elasticsearch.add(payload);
 	});
