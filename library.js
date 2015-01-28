@@ -8,8 +8,8 @@ var db = module.parent.require('./database'),
 	async = module.parent.require('async'),
 	_ = module.parent.require('underscore'),
 
-	LRU = require('lru-cache'),
-	cache = LRU({ max: 20, maxAge: 1000 * 60 * 60 }),	// Remember the last 20 searches in the past hour
+	//LRU = require('lru-cache'),
+	//cache = LRU({ max: 20, maxAge: 1000 * 60 * 60 }),	// Remember the last 20 searches in the past hour
 
 	topics = module.parent.require('./topics'),
 	posts = module.parent.require('./posts'),
@@ -207,9 +207,11 @@ Elasticsearch.search = function(data, callback) {
 		return callback(null, []);
 	}
 
+	/*
 	if (cache.has(data.query)) {
 		return callback(null, cache.get(data.query));
 	}
+	*/
 
 	if (!Elasticsearch.client) {
 		return callback(new Error('not-connected'));
@@ -249,10 +251,10 @@ Elasticsearch.search = function(data, callback) {
 			});
 
 			callback(null, payload);
-			cache.set(data.query, payload);
+			//cache.set(data.query, payload);
 		} else {
 			callback(null, []);
-			cache.set(data.query, []);
+			//cache.set(data.query, []);
 		}
 	});
 };
