@@ -639,15 +639,22 @@ Elasticsearch.deindexTopic = function(tid) {
 };
 
 Elasticsearch.indexPost = function(postData, callback) {
-	if (!postData || !postData.pid || !postData.content) {
-		return callback(null);
+	if (!postData || !postData.pid) {
+		if (typeof callback === 'function') {
+			return callback(new Error('Post data is null or missing pid.'));
+		} else {
+			return;
+		}
 	}
 
 	var payload = {
 		id: postData.pid
 	};
 
-	payload.content = postData.content;
+	// We are allowing posts with null content to be indexed.
+	if (postData.content) {
+		payload.content = postData.content;
+	}
 
 	if (typeof callback === 'function') {
 		callback(undefined, payload);
