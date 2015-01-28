@@ -684,17 +684,7 @@ Elasticsearch.createIndex = function(callback) {
 	var indexName = Elasticsearch.config.index_name;
 	if (indexName && 0 < indexName.length) {
 		Elasticsearch.client.indices.create({
-			index : Elasticsearch.config.index_name,
-			body: {
-				mappings: {
-					posts: {
-						properties : {
-							content : { type : "string" }, // Post content
-							title : { type : "string" } // Topic title
-						}
-					}
-				}
-			}
+			index : Elasticsearch.config.index_name
 		}, function(err, results){
 			if (!err) {
 				callback(null, results);
