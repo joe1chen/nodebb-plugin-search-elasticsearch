@@ -13,6 +13,7 @@ var db = module.parent.require('./database'),
 
 	topics = module.parent.require('./topics'),
 	posts = module.parent.require('./posts'),
+	batch = module.parent.require('./batch'),
 
 	escapeSpecialChars = function(s) {
 		return s.replace(/([\+\-&\|!\(\)\{\}\[\]\^"~\*\?:\\\ ])/g, function(match) {
@@ -32,7 +33,8 @@ var db = module.parent.require('./database'),
 			sniffOnConnectionFault: true,   // Should the client immediately sniff for a more current list of nodes when a connection dies?
 			host: 'localhost:9200',
 			index_name: 'nodebb',
-			post_type: 'posts'
+			post_type: 'posts',
+			batch_size: 1000
 		},	// default is localhost:9200
 		client: undefined
 	};
@@ -668,36 +670,38 @@ Elasticsearch.rebuildIndex = function(req, res) {
 			return
 		}
 
-		async.waterfall([
-			async.apply(db.getSortedSetRange, 'topics:tid', 0, -1),
-			function(tids, next) {
-				topics.getTopicsFields(tids, ['tid', 'mainPid', 'title'], next);
-			}
-		], function(err, topics) {
-			if (err) {
-				return winston.error('[plugins/elasticsearch] Could not retrieve topic listing for indexing. Error: ' + err.message);
-			}
+		batch.processSortedSet('topics:tid', function(tids, next) {
+			topics.getTopicsFields(tids, ['tid', 'mainPid', 'title'], function(err, topics) {
+				if (err) {
+					return next(err);
+				}
+				async.map(topics, Elasticsearch.indexTopic, function(err, topicPayloads) {
+					var payload = topicPayloads.reduce(function(currentPayload, topics) {
+						if (Array.isArray(topics)) {
+							return currentPayload.concat(topics);
+						} else {
+							currentPayload.push(topics);
+						}
+					}, []).filter(function(entry) {
+						if (entry) {
+							return entry.hasOwnProperty('id');
+						}
+						return false;
+					});
 
-			async.map(topics, Elasticsearch.indexTopic, function(err, topicPayloads) {
-				var payload = topicPayloads.reduce(function(currentPayload, topics) {
-					if (Array.isArray(topics)) {
-						return currentPayload.concat(topics);
-					} else {
-						currentPayload.push(topics);
-					}
-				}, []).filter(function(entry) {
-					if (entry) {
-						return entry.hasOwnProperty('id');
-					}
-					return false;
-				});
+					Elasticsearch.add(payload, function(err, obj) {
+						if (err) {
+							return next(err);
+						}
 
-				Elasticsearch.add(payload, function(err, obj) {
-					if (!err) {
-						res.sendStatus(200);
-					}
+						next();
+					});
 				});
 			});
+		}, {batch: parseInt(Elasticsearch.config.batch_size, 10)}, function(err) {
+			if (!err) {
+				res.sendStatus(200);
+			}
 		});
 	});
 };

@@ -35,7 +35,10 @@
 				<label for="post_type">Post Type</label>
 				<input class="form-control" type="text" name="post_type" id="post_type" placeholder="Default: posts" />
 			</div>
-
+			<div class="form-group">
+				<label for="post_type">Batch Index Size</label>
+				<input class="form-control" type="text" name="batch_size" id="batch_size" placeholder="Default: 1000" />
+			</div>
 			<button id="save" type="button" class="btn btn-primary btn-block">Save</button>
 		</form>
 
