@@ -660,7 +660,8 @@ Elasticsearch.deindexPost = Elasticsearch.post.delete;
 Elasticsearch.rebuildIndex = function(req, res) {
 
 	async.series([
-		Elasticsearch.deleteIndex
+		Elasticsearch.deleteIndex,
+		Elasticsearch.createIndex
 	],
 	function(err, results){
 		if (err) {
@@ -703,6 +704,30 @@ Elasticsearch.rebuildIndex = function(req, res) {
 			}
 		});
 	});
+};
+
+Elasticsearch.createIndex = function(callback) {
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
+
+	var indexName = Elasticsearch.config.index_name;
+	if (indexName && 0 < indexName.length) {
+		Elasticsearch.client.indices.create({
+			index : Elasticsearch.config.index_name
+		}, function(err, results){
+			if (!err) {
+				callback(null, results);
+			}
+			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
+				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
+				callback(null);
+			}
+			else {
+				callback(err);
+			}
+		});
+	}
 };
 
 Elasticsearch.deleteIndex = function(callback) {
