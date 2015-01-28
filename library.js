@@ -214,6 +214,8 @@ Elasticsearch.search = function(data, callback) {
 		}
 
 		var query = {
+			index: Elasticsearch.config.index_name,
+			type: Elasticsearch.config.post_type,
 			body: {
 				query: {
 					dis_max: {
