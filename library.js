@@ -208,54 +208,53 @@ Elasticsearch.search = function(data, callback) {
 	}
 
 	if (cache.has(data.query)) {
-		callback(null, cache.get(data.query));
-	} else {
-
-		if (!Elasticsearch.client) {
-			return callback(new Error('not-connected'));
-		}
-
-		var query = {
-			index: Elasticsearch.config.index_name,
-			type: Elasticsearch.config.post_type,
-			body: {
-				query: {
-					dis_max: {
-						queries: [
-							{
-								match: {
-									content: escapeSpecialChars(data.query)
-								}
-							},
-							{
-								match: {
-									title: escapeSpecialChars(data.query)
-								}
-							}
-						]
-					}
-				},
-				from: 0,
-				size: 20
-			}
-		};
-
-		Elasticsearch.client.search(query, function(err, obj) {
-			if (err) {
-				callback(err);
-			} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
-				var payload = obj.hits.hits.map(function(result) {
-					return parseInt(result._id, 10);
-				});
-
-				callback(null, payload);
-				cache.set(data.query, payload);
-			} else {
-				callback(null, []);
-				cache.set(data.query, []);
-			}
-		});
+		return callback(null, cache.get(data.query));
 	}
+
+	if (!Elasticsearch.client) {
+		return callback(new Error('not-connected'));
+	}
+
+	var query = {
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
+		body: {
+			query: {
+				dis_max: {
+					queries: [
+						{
+							match: {
+								content: escapeSpecialChars(data.query)
+							}
+						},
+						{
+							match: {
+								title: escapeSpecialChars(data.query)
+							}
+						}
+					]
+				}
+			},
+			from: 0,
+			size: 20
+		}
+	};
+
+	Elasticsearch.client.search(query, function(err, obj) {
+		if (err) {
+			callback(err);
+		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
+			var payload = obj.hits.hits.map(function(result) {
+				return parseInt(result._id, 10);
+			});
+
+			callback(null, payload);
+			cache.set(data.query, payload);
+		} else {
+			callback(null, []);
+			cache.set(data.query, []);
+		}
+	});
 };
 
 Elasticsearch.searchTopic = function(data, callback) {
