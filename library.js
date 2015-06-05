@@ -226,12 +226,12 @@ Elasticsearch.search = function(data, callback) {
 					queries: [
 						{
 							match: {
-								content: escapeSpecialChars(data.query)
+								content: escapeSpecialChars(data.content)
 							}
 						},
 						{
 							match: {
-								title: escapeSpecialChars(data.query)
+								title: escapeSpecialChars(data.content)
 							}
 						}
 					]
