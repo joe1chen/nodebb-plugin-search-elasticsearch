@@ -515,12 +515,12 @@ Elasticsearch.topic.post = function(topicObj) {
 	Elasticsearch.indexTopic(topicObj);
 };
 
-Elasticsearch.topic.delete = function(tid) {
+Elasticsearch.topic.delete = function(topicData) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.deindexTopic(tid);
+	Elasticsearch.deindexTopic(topicData.tid);
 };
 
 Elasticsearch.topic.restore = function(topicObj) {
