@@ -516,11 +516,12 @@ Elasticsearch.topic.post = function(topicObj) {
 };
 
 Elasticsearch.topic.delete = function(topicData) {
+	var tid = (void 0 === topicData.tid) ? topicData : topicData.tid;
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.deindexTopic(topicData.tid);
+	Elasticsearch.deindexTopic(tid);
 };
 
 Elasticsearch.topic.restore = function(topicObj) {
