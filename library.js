@@ -515,7 +515,8 @@ Elasticsearch.topic.post = function(topicObj) {
 	Elasticsearch.indexTopic(topicObj);
 };
 
-Elasticsearch.topic.delete = function(tid) {
+Elasticsearch.topic.delete = function(topicData) {
+	var tid = (void 0 === topicData.tid) ? topicData : topicData.tid;
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
