@@ -75,8 +75,8 @@ Elasticsearch.init = function(data, callback) {
 };
 
 Elasticsearch.ping = function(callback) {
-	if (Elasticsearch.client) {
-		Elasticsearch.client.ping(callback);
+	if (client) {
+		client.ping(callback);
 	} else {
 		callback(new Error('not-connected'));
 	}
@@ -224,7 +224,6 @@ Elasticsearch.search = function(data, callback) {
 
 	var query = {
 		index: Elasticsearch.config.index_name,
-		type: Elasticsearch.config.post_type,
 		body: {
 			query: {
 				dis_max: {
