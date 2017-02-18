@@ -16,3 +16,7 @@ This plugin extends NodeBB to utilise an installation of Elasticsearch as a sear
 ##  Modification 
 1. fixed the bug of latest version of elasticsearch api (^12.x.x) 
 2. fixed searcingh result id error 
+
+##TODO
+1. fixation of the bug which searchTopic method does not called by filer:topic.search hook properly  
+2. getTopicCount method cannot get the inner value of a nested json object 
