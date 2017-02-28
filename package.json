@@ -14,9 +14,15 @@
     "search"
   ],
   "author": {
-    "name": "joe1chen","q8888620002"
-    "email": "joseph.chen@gmail.com","q8888620002@hotmail.com"
+    "name": "joe1chen",
+    "email": "joseph.chen@gmail.com"
   },
+  "contributors": [
+    {
+      "name": "q8888620002",
+      "email": "q8888620002@hotmail.com"
+    }
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/joe1chen/nodebb-plugin-search-elasticsearch/issues"
