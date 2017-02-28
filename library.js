@@ -20,7 +20,12 @@ var db = module.parent.require('./database'),
 			return '\\' + match;
 		});
 	},
-
+	
+	client = new elasticsearch.Client({
+  		host: 'localhost:9200'
+  		// log: 'trace'
+	}),
+	// this config dosen't work for newer version of elasticsearch api 
 	Elasticsearch = {
 		/*
 			Defaults configs:
@@ -70,8 +75,8 @@ Elasticsearch.init = function(data, callback) {
 };
 
 Elasticsearch.ping = function(callback) {
-	if (Elasticsearch.client) {
-		Elasticsearch.client.ping(callback);
+	if (client) {
+		client.ping(callback);
 	} else {
 		callback(new Error('not-connected'));
 	}
@@ -219,7 +224,6 @@ Elasticsearch.search = function(data, callback) {
 
 	var query = {
 		index: Elasticsearch.config.index_name,
-		type: Elasticsearch.config.post_type,
 		body: {
 			query: {
 				dis_max: {
@@ -241,13 +245,14 @@ Elasticsearch.search = function(data, callback) {
 			size: 20
 		}
 	};
-
-	Elasticsearch.client.search(query, function(err, obj) {
+	// changing the client obj
+	client.search(query, function(err, obj) {
 		if (err) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
 			var payload = obj.hits.hits.map(function(result) {
-				return parseInt(result._id, 10);
+				// return the correct post id 
+				return parseInt(result._source.pid, 10);
 			});
 
 			callback(null, payload);
