@@ -211,17 +211,17 @@ Elasticsearch.search = function(data, callback) {
 	var queryMatches = [
 		{
 			match: {
-				title: escapeSpecialChars(data.content)
+				content: escapeSpecialChars(data.content)
 			}
 		}
 	];
 
-	if (data.index !== 'topic') {
-		queryMatches.push({
+	if (data.index === 'topic') {
+		queryMatches = [{
 			match: {
-				content: escapeSpecialChars(data.content)
+				title: escapeSpecialChars(data.content)
 			}
-		});
+		}];
 	}
 
 	/*
