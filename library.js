@@ -20,12 +20,12 @@ var db = module.parent.require('./database'),
 			return '\\' + match;
 		});
 	},
-	
+
 	client = new elasticsearch.Client({
   		host: 'localhost:9200'
   		// log: 'trace'
 	}),
-	// this config dosen't work for newer version of elasticsearch api 
+	// this config dosen't work for newer version of elasticsearch api
 	Elasticsearch = {
 		/*
 			Defaults configs:
@@ -251,8 +251,8 @@ Elasticsearch.search = function(data, callback) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
 			var payload = obj.hits.hits.map(function(result) {
-				// return the correct post id 
-				return parseInt(result._source.pid, 10);
+				// return the correct post id
+				return parseInt(result._source.id, 10);
 			});
 
 			callback(null, payload);
