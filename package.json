@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-search-elasticsearch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Full-text searching using Elasticsearch",
   "main": "library.js",
   "repository": {
@@ -21,6 +21,9 @@
     {
       "name": "q8888620002",
       "email": "q8888620002@hotmail.com"
+    }, {
+      "name": "River",
+      "email": "revir.qing@gmail.com"
     }
   ],
   "license": "MIT",

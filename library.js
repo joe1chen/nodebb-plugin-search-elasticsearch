@@ -207,9 +207,21 @@ Elasticsearch.search = function(data, callback) {
 		// The dbsearch plugin was detected, abort search!
 		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
-	} else if (data.index === 'topic') {
-		// We are only using the "post" index, because Elasticsearch does its own relevency sorting
-		return callback(null, []);
+	}
+	var queryMatches = [
+		{
+			match: {
+				title: escapeSpecialChars(data.content)
+			}
+		}
+	];
+
+	if (data.index !== 'topic') {
+		queryMatches.push({
+			match: {
+				content: escapeSpecialChars(data.content)
+			}
+		});
 	}
 
 	/*
@@ -227,18 +239,7 @@ Elasticsearch.search = function(data, callback) {
 		body: {
 			query: {
 				dis_max: {
-					queries: [
-						{
-							match: {
-								content: escapeSpecialChars(data.content)
-							}
-						},
-						{
-							match: {
-								title: escapeSpecialChars(data.content)
-							}
-						}
-					]
+					queries: queryMatches
 				}
 			},
 			from: 0,
@@ -252,6 +253,9 @@ Elasticsearch.search = function(data, callback) {
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
 			var payload = obj.hits.hits.map(function(result) {
 				// return the correct post id
+				if (data.index === 'topic') {
+					return parseInt(result._source.tid, 10);
+				}
 				return parseInt(result._source.id, 10);
 			});
 
@@ -588,6 +592,9 @@ Elasticsearch.indexTopic = function(topicObj, callback) {
 			if (payload[x]) {
 				if (payload[x].id === topicObj.mainPid) {
 					payload[x].title = topicObj.title;
+
+					// add tid to main post, so search topic could get tid.
+					payload[x].tid = topicObj.tid;
 				}
 			}
 		}
