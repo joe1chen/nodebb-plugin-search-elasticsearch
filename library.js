@@ -764,7 +764,7 @@ Elasticsearch.deleteIndex = function(callback) {
 			if (!err) {
 				callback(null, results);
 			}
-			else if ( /IndexMissingException/im.test(err.message) ) { // we can ignore if index is not there
+			else if ( /IndexMissingException|index_not_found_exception/im.test(err.message) ) { // we can ignore if index is not there
 				winston.info("[plugin/elasticsearch] Ignoring error deleting mapping " + err);
 				callback(null);
 			}
