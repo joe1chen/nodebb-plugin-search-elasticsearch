@@ -208,20 +208,14 @@ Elasticsearch.search = function(data, callback) {
 		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
 	}
-	var queryMatches = [
-		{
-			match: {
-				content: escapeSpecialChars(data.content)
-			}
-		}
-	];
+	var queryMatch = {
+		content: escapeSpecialChars(data.content)
+	};
 
 	if (data.index === 'topic') {
-		queryMatches = [{
-			match: {
-				title: escapeSpecialChars(data.content)
-			}
-		}];
+		queryMatch = {
+			title: escapeSpecialChars(data.content)
+		};
 	}
 
 	/*
@@ -238,19 +232,19 @@ Elasticsearch.search = function(data, callback) {
 		index: Elasticsearch.config.index_name,
 		body: {
 			query: {
-				dis_max: {
-					queries: queryMatches
-				}
+				match: queryMatch
 			},
 			from: 0,
 			size: 20
 		}
 	};
 	// changing the client obj
+	console.log('search query', query);
 	client.search(query, function(err, obj) {
 		if (err) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
+			console.log('search hits', obj.hits.hits);
 			var payload = obj.hits.hits.map(function(result) {
 				// return the correct post id
 				if (data.index === 'topic') {
@@ -680,16 +674,21 @@ Elasticsearch.deindexPost = Elasticsearch.post.delete;
 
 Elasticsearch.rebuildIndex = function(req, res) {
 
-	async.series([
-		Elasticsearch.deleteIndex,
-		Elasticsearch.createIndex
+	async.waterfall([
+		function(next) {
+			Elasticsearch.client.deleteByQuery({
+				index: Elasticsearch.config.index_name,
+				type: Elasticsearch.config.post_type,
+				q: '*'
+			}, next);
+		}
 	],
 	function(err, results){
-		if (err) {
-			winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
-			res.sendStatus(500);
-			return
-		}
+		// if (err) {
+		// 	winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
+		// 	res.sendStatus(500);
+		// 	return
+		// }
 
 		batch.processSortedSet('topics:tid', function(tids, next) {
 			topics.getTopicsFields(tids, ['tid', 'mainPid', 'title'], function(err, topics) {
