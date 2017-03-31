@@ -20,12 +20,12 @@ var db = module.parent.require('./database'),
 			return '\\' + match;
 		});
 	},
-	
+
 	client = new elasticsearch.Client({
   		host: 'localhost:9200'
   		// log: 'trace'
 	}),
-	// this config dosen't work for newer version of elasticsearch api 
+	// this config dosen't work for newer version of elasticsearch api
 	Elasticsearch = {
 		/*
 			Defaults configs:
@@ -207,9 +207,15 @@ Elasticsearch.search = function(data, callback) {
 		// The dbsearch plugin was detected, abort search!
 		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
-	} else if (data.index === 'topic') {
-		// We are only using the "post" index, because Elasticsearch does its own relevency sorting
-		return callback(null, []);
+	}
+	var queryMatch = {
+		content: escapeSpecialChars(data.content)
+	};
+
+	if (data.index === 'topic') {
+		queryMatch = {
+			title: escapeSpecialChars(data.content)
+		};
 	}
 
 	/*
@@ -226,33 +232,25 @@ Elasticsearch.search = function(data, callback) {
 		index: Elasticsearch.config.index_name,
 		body: {
 			query: {
-				dis_max: {
-					queries: [
-						{
-							match: {
-								content: escapeSpecialChars(data.content)
-							}
-						},
-						{
-							match: {
-								title: escapeSpecialChars(data.content)
-							}
-						}
-					]
-				}
+				match: queryMatch
 			},
 			from: 0,
 			size: 20
 		}
 	};
 	// changing the client obj
+	console.log('search query', query);
 	client.search(query, function(err, obj) {
 		if (err) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
+			console.log('search hits', obj.hits.hits);
 			var payload = obj.hits.hits.map(function(result) {
-				// return the correct post id 
-				return parseInt(result._source.pid, 10);
+				// return the correct post id
+				if (data.index === 'topic') {
+					return parseInt(result._source.tid, 10);
+				}
+				return parseInt(result._source.id, 10);
 			});
 
 			callback(null, payload);
@@ -588,6 +586,9 @@ Elasticsearch.indexTopic = function(topicObj, callback) {
 			if (payload[x]) {
 				if (payload[x].id === topicObj.mainPid) {
 					payload[x].title = topicObj.title;
+
+					// add tid to main post, so search topic could get tid.
+					payload[x].tid = topicObj.tid;
 				}
 			}
 		}
@@ -673,16 +674,21 @@ Elasticsearch.deindexPost = Elasticsearch.post.delete;
 
 Elasticsearch.rebuildIndex = function(req, res) {
 
-	async.series([
-		Elasticsearch.deleteIndex,
-		Elasticsearch.createIndex
+	async.waterfall([
+		function(next) {
+			Elasticsearch.client.deleteByQuery({
+				index: Elasticsearch.config.index_name,
+				type: Elasticsearch.config.post_type,
+				q: '*'
+			}, next);
+		}
 	],
 	function(err, results){
-		if (err) {
-			winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
-			res.sendStatus(500);
-			return
-		}
+		// if (err) {
+		// 	winston.error('[plugin/elasticsearch] Could not delete and re-create index. Error: ' + err.message);
+		// 	res.sendStatus(500);
+		// 	return
+		// }
 
 		batch.processSortedSet('topics:tid', function(tids, next) {
 			topics.getTopicsFields(tids, ['tid', 'mainPid', 'title'], function(err, topics) {
@@ -757,7 +763,7 @@ Elasticsearch.deleteIndex = function(callback) {
 			if (!err) {
 				callback(null, results);
 			}
-			else if ( /IndexMissingException/im.test(err.message) ) { // we can ignore if index is not there
+			else if ( /IndexMissingException|index_not_found_exception/im.test(err.message) ) { // we can ignore if index is not there
 				winston.info("[plugin/elasticsearch] Ignoring error deleting mapping " + err);
 				callback(null);
 			}
