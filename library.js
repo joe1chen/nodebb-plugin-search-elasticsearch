@@ -208,6 +208,9 @@ Elasticsearch.search = function(data, callback) {
 		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
 	}
+	if (!data.content) {
+		return callback(null, []);
+	}
 	var queryMatch = {
 		content: escapeSpecialChars(data.content)
 	};
