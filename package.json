@@ -37,6 +37,6 @@
     "underscore.string": "^2.4.0"
   },
   "nbbpm": {
-    "compatibility": "^1.x.x"
+    "compatibility": "^1.5.x"
   }
 }

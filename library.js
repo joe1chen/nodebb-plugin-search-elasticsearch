@@ -478,20 +478,20 @@ Elasticsearch.flush = function(req, res) {
 };
 
 Elasticsearch.post = {};
-Elasticsearch.post.save = function(postData) {
+Elasticsearch.post.save = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexPost(postData);
+	Elasticsearch.indexPost(obj.post);
 };
 
-Elasticsearch.post.delete = function(pid, callback) {
+Elasticsearch.post.delete = function(obj, callback) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.remove(pid);
+	Elasticsearch.remove(obj.post.pid);
 
 	if (typeof callback === 'function') {
 		if (!parseInt(Elasticsearch.config.enabled, 10)) {
@@ -502,59 +502,58 @@ Elasticsearch.post.delete = function(pid, callback) {
 	}
 };
 
-Elasticsearch.post.restore = function(postData) {
+Elasticsearch.post.restore = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexPost(postData);
+	Elasticsearch.indexPost(obj.post);
 };
 
 Elasticsearch.post.edit = Elasticsearch.post.restore;
 
 Elasticsearch.topic = {};
-Elasticsearch.topic.post = function(topicObj) {
+Elasticsearch.topic.post = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexTopic(topicObj);
+	Elasticsearch.indexTopic(obj.topic);
 };
 
-Elasticsearch.topic.delete = function(topicData) {
-	var tid = (void 0 === topicData.tid) ? topicData : topicData.tid;
+Elasticsearch.topic.delete = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.deindexTopic(tid);
+	Elasticsearch.deindexTopic(obj.topic.tid);
 };
 
-Elasticsearch.topic.restore = function(topicObj) {
+Elasticsearch.topic.restore = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexTopic(topicObj);
+	Elasticsearch.indexTopic(obj.topic);
 };
 
-Elasticsearch.topic.edit = function(topicObj) {
+Elasticsearch.topic.edit = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
 	async.waterfall([
-		async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
+		async.apply(posts.getPostFields, obj.topic.mainPid, ['pid', 'content']),
 		Elasticsearch.indexPost,
 	], function(err, payload) {
 		if (err) {
 			return winston.error(err.message);
 		}
 		if (!payload) {
-			return winston.warn('[plugins/elasticsearch] no payload for pid ' + topicObj.mainPid);
+			return winston.warn('[plugins/elasticsearch] no payload for pid ' + obj.topic.mainPid);
 		}
 
-		payload.title = topicObj.title;
+		payload.title = obj.topic.title;
 		Elasticsearch.add(payload);
 	});
 };
