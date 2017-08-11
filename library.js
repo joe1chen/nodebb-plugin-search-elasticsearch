@@ -6,7 +6,7 @@ var db = module.parent.require('./database'),
 	winston = module.parent.require('winston'),
 	elasticsearch = require('elasticsearch'),
 	async = module.parent.require('async'),
-	_ = module.parent.require('underscore'),
+	_ = require('underscore'),
 
 	//LRU = require('lru-cache'),
 	//cache = LRU({ max: 20, maxAge: 1000 * 60 * 60 }),	// Remember the last 20 searches in the past hour
