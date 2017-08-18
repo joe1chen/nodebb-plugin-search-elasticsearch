@@ -165,7 +165,8 @@ Elasticsearch.getTopicCount = function(callback) {
 };
 
 Elasticsearch.connect = function() {
-	if (!Elasticsearch.config.host) {
+	var originalHost = Elasticsearch.config.host || Elasticsearch.originalHost;
+	if (!originalHost) {
 		return;
 	}
 
@@ -174,7 +175,7 @@ Elasticsearch.connect = function() {
 	}
 
 	// Convert host to array
-	var hosts = Elasticsearch.config.host.split(',');
+	var hosts = originalHost.split(',');
 	hosts = _.map(hosts, function(host){ return _.trim(host); });
 
 	// Compact array to remove empty elements just in case.
@@ -187,6 +188,7 @@ Elasticsearch.connect = function() {
 	Elasticsearch.config.hosts = hosts;
 
 	// Now remove the host since we're going to use hosts.
+	Elasticsearch.originalHost = originalHost;
 	delete Elasticsearch.config.host;
 
 	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
