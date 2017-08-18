@@ -190,6 +190,8 @@ Elasticsearch.connect = function() {
 	delete Elasticsearch.config.host;
 
 	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
+
+	Elasticsearch.createIndex();
 };
 
 Elasticsearch.adminMenu = function(custom_header, callback) {
@@ -242,12 +244,12 @@ Elasticsearch.search = function(data, callback) {
 		}
 	};
 	// changing the client obj
-	console.log('search query', query);
+	// console.log('search query', query);
 	client.search(query, function(err, obj) {
 		if (err) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
-			console.log('search hits', obj.hits.hits);
+			// console.log('search hits', obj.hits.hits);
 			var payload = obj.hits.hits.map(function(result) {
 				// return the correct post id
 				if (data.index === 'topic') {
@@ -473,6 +475,42 @@ Elasticsearch.flush = function(req, res) {
 			res.send(500, err.message);
 		} else {
 			res.send(200);
+		}
+	});
+};
+
+Elasticsearch.createIndex = function() {
+	if (!Elasticsearch.client) {
+		return;
+	}
+	console.log('createIndex....');
+	Elasticsearch.client.indices.create({
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
+		body: {
+	      "properties": {
+	        "title": {
+	            "type": "string",
+	            "analyzer": "ik_smart",
+	            "search_analyzer": "ik_smart"
+	        },
+	        "content": {
+	            "type": "string",
+	            "analyzer": "ik_smart",
+	            "search_analyzer": "ik_smart",
+	            "include_in_all": "true",
+	            "boost": 8
+	        }
+	      }
+		}
+	}, function (err, resp, respcode) {
+		if ( err && /IndexAlreadyExistsException|index_already_exists_exception/im.test(err.message) ) {
+			winston.info('Elasticsearch index already exists.');
+		} else if (err) {
+			winston.error('Elasticsearch create index failed');
+			winston.error(err);
+		} else {
+			winston.info('Elasticsearch create index succeed.');
 		}
 	});
 };
@@ -728,29 +766,29 @@ Elasticsearch.rebuildIndex = function(req, res) {
 	});
 };
 
-Elasticsearch.createIndex = function(callback) {
-	if (!Elasticsearch.client) {
-		return callback(new Error('not-connected'));
-	}
+// Elasticsearch.createIndex = function(callback) {
+// 	if (!Elasticsearch.client) {
+// 		return callback(new Error('not-connected'));
+// 	}
 
-	var indexName = Elasticsearch.config.index_name;
-	if (indexName && 0 < indexName.length) {
-		Elasticsearch.client.indices.create({
-			index : Elasticsearch.config.index_name
-		}, function(err, results){
-			if (!err) {
-				callback(null, results);
-			}
-			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
-				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
-				callback(null);
-			}
-			else {
-				callback(err);
-			}
-		});
-	}
-};
+// 	var indexName = Elasticsearch.config.index_name;
+// 	if (indexName && 0 < indexName.length) {
+// 		Elasticsearch.client.indices.create({
+// 			index : Elasticsearch.config.index_name
+// 		}, function(err, results){
+// 			if (!err) {
+// 				callback(null, results);
+// 			}
+// 			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
+// 				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
+// 				callback(null);
+// 			}
+// 			else {
+// 				callback(err);
+// 			}
+// 		});
+// 	}
+// };
 
 Elasticsearch.deleteIndex = function(callback) {
 	if (!Elasticsearch.client) {
