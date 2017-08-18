@@ -21,10 +21,8 @@ var db = module.parent.require('./database'),
 		});
 	},
 
-	client = new elasticsearch.Client({
-  		host: 'localhost:9200'
-  		// log: 'trace'
-	}),
+	client = null,
+
 	// this config dosen't work for newer version of elasticsearch api
 	Elasticsearch = {
 		/*
@@ -191,7 +189,10 @@ Elasticsearch.connect = function() {
 	Elasticsearch.originalHost = originalHost;
 	delete Elasticsearch.config.host;
 
-	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
+	// Elasticsearch.config.host = 'elasticsearch24';
+	// Elasticsearch.config.port = 9200;
+	console.log('Elasticsearch connect: ', Elasticsearch.config);
+	client = Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
 
 	Elasticsearch.createIndex();
 };
