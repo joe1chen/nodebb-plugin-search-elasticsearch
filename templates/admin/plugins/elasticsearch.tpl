@@ -129,7 +129,7 @@
 						data: {
 							_csrf: csrf
 						}
-					}).success(function() {
+					}).done(function() {
 						ajaxify.refresh();
 
 						app.alert({
@@ -152,7 +152,7 @@
 					_csrf: csrf,
 					state: parseInt($('button[data-action="toggle"]').attr('data-enabled'), 10) ^ 1
 				}
-			}).success(ajaxify.refresh);
+			}).done(ajaxify.refresh);
 		});
 
 		// Index All event
@@ -171,7 +171,7 @@
 						data: {
 							_csrf: csrf
 						}
-					}).success(function() {
+					}).done(function() {
 						ajaxify.refresh();
 
 						app.alert({

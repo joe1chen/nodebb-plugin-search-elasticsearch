@@ -6,7 +6,7 @@ var db = module.parent.require('./database'),
 	winston = module.parent.require('winston'),
 	elasticsearch = require('elasticsearch'),
 	async = module.parent.require('async'),
-	_ = module.parent.require('underscore'),
+	_ = require('underscore'),
 
 	//LRU = require('lru-cache'),
 	//cache = LRU({ max: 20, maxAge: 1000 * 60 * 60 }),	// Remember the last 20 searches in the past hour
@@ -21,10 +21,8 @@ var db = module.parent.require('./database'),
 		});
 	},
 
-	client = new elasticsearch.Client({
-  		host: 'localhost:9200'
-  		// log: 'trace'
-	}),
+	client = null,
+
 	// this config dosen't work for newer version of elasticsearch api
 	Elasticsearch = {
 		/*
@@ -165,7 +163,8 @@ Elasticsearch.getTopicCount = function(callback) {
 };
 
 Elasticsearch.connect = function() {
-	if (!Elasticsearch.config.host) {
+	var originalHost = Elasticsearch.config.host || Elasticsearch.originalHost;
+	if (!originalHost) {
 		return;
 	}
 
@@ -174,7 +173,7 @@ Elasticsearch.connect = function() {
 	}
 
 	// Convert host to array
-	var hosts = Elasticsearch.config.host.split(',');
+	var hosts = originalHost.split(',');
 	hosts = _.map(hosts, function(host){ return _.trim(host); });
 
 	// Compact array to remove empty elements just in case.
@@ -187,9 +186,15 @@ Elasticsearch.connect = function() {
 	Elasticsearch.config.hosts = hosts;
 
 	// Now remove the host since we're going to use hosts.
+	Elasticsearch.originalHost = originalHost;
 	delete Elasticsearch.config.host;
 
-	Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
+	// Elasticsearch.config.host = 'elasticsearch24';
+	// Elasticsearch.config.port = 9200;
+	console.log('Elasticsearch connect: ', Elasticsearch.config);
+	client = Elasticsearch.client = new elasticsearch.Client(Elasticsearch.config);
+
+	Elasticsearch.createIndex();
 };
 
 Elasticsearch.adminMenu = function(custom_header, callback) {
@@ -207,6 +212,9 @@ Elasticsearch.search = function(data, callback) {
 		// The dbsearch plugin was detected, abort search!
 		winston.warn('[plugin/elasticsearch] Another search plugin (dbsearch or solr) is enabled, so search via Elasticsearch was aborted.');
 		return callback(null, data);
+	}
+	if (!data.content) {
+		return callback(null, []);
 	}
 	var queryMatch = {
 		content: escapeSpecialChars(data.content)
@@ -239,12 +247,12 @@ Elasticsearch.search = function(data, callback) {
 		}
 	};
 	// changing the client obj
-	console.log('search query', query);
+	// console.log('search query', query);
 	client.search(query, function(err, obj) {
 		if (err) {
 			callback(err);
 		} else if (obj && obj.hits && obj.hits.hits && obj.hits.hits.length > 0) {
-			console.log('search hits', obj.hits.hits);
+			// console.log('search hits', obj.hits.hits);
 			var payload = obj.hits.hits.map(function(result) {
 				// return the correct post id
 				if (data.index === 'topic') {
@@ -474,21 +482,57 @@ Elasticsearch.flush = function(req, res) {
 	});
 };
 
-Elasticsearch.post = {};
-Elasticsearch.post.save = function(postData) {
-	if (!parseInt(Elasticsearch.config.enabled, 10)) {
+Elasticsearch.createIndex = function() {
+	if (!Elasticsearch.client) {
 		return;
 	}
-
-	Elasticsearch.indexPost(postData);
+	console.log('createIndex....');
+	Elasticsearch.client.indices.create({
+		index: Elasticsearch.config.index_name,
+		type: Elasticsearch.config.post_type,
+		body: {
+	      "properties": {
+	        "title": {
+	            "type": "string",
+	            "analyzer": "ik_smart",
+	            "search_analyzer": "ik_smart"
+	        },
+	        "content": {
+	            "type": "string",
+	            "analyzer": "ik_smart",
+	            "search_analyzer": "ik_smart",
+	            "include_in_all": "true",
+	            "boost": 8
+	        }
+	      }
+		}
+	}, function (err, resp, respcode) {
+		if ( err && /IndexAlreadyExistsException|index_already_exists_exception/im.test(err.message) ) {
+			winston.info('Elasticsearch index already exists.');
+		} else if (err) {
+			winston.error('Elasticsearch create index failed');
+			winston.error(err);
+		} else {
+			winston.info('Elasticsearch create index succeed.');
+		}
+	});
 };
 
-Elasticsearch.post.delete = function(pid, callback) {
+Elasticsearch.post = {};
+Elasticsearch.post.save = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.remove(pid);
+	Elasticsearch.indexPost(obj.post);
+};
+
+Elasticsearch.post.delete = function(obj, callback) {
+	if (!parseInt(Elasticsearch.config.enabled, 10)) {
+		return;
+	}
+
+	Elasticsearch.remove(obj.post.pid);
 
 	if (typeof callback === 'function') {
 		if (!parseInt(Elasticsearch.config.enabled, 10)) {
@@ -499,59 +543,58 @@ Elasticsearch.post.delete = function(pid, callback) {
 	}
 };
 
-Elasticsearch.post.restore = function(postData) {
+Elasticsearch.post.restore = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexPost(postData);
+	Elasticsearch.indexPost(obj.post);
 };
 
 Elasticsearch.post.edit = Elasticsearch.post.restore;
 
 Elasticsearch.topic = {};
-Elasticsearch.topic.post = function(topicObj) {
+Elasticsearch.topic.post = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexTopic(topicObj);
+	Elasticsearch.indexTopic(obj.topic);
 };
 
-Elasticsearch.topic.delete = function(topicData) {
-	var tid = (void 0 === topicData.tid) ? topicData : topicData.tid;
+Elasticsearch.topic.delete = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.deindexTopic(tid);
+	Elasticsearch.deindexTopic(obj.topic.tid);
 };
 
-Elasticsearch.topic.restore = function(topicObj) {
+Elasticsearch.topic.restore = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
-	Elasticsearch.indexTopic(topicObj);
+	Elasticsearch.indexTopic(obj.topic);
 };
 
-Elasticsearch.topic.edit = function(topicObj) {
+Elasticsearch.topic.edit = function(obj) {
 	if (!parseInt(Elasticsearch.config.enabled, 10)) {
 		return;
 	}
 
 	async.waterfall([
-		async.apply(posts.getPostFields, topicObj.mainPid, ['pid', 'content']),
+		async.apply(posts.getPostFields, obj.topic.mainPid, ['pid', 'content']),
 		Elasticsearch.indexPost,
 	], function(err, payload) {
 		if (err) {
 			return winston.error(err.message);
 		}
 		if (!payload) {
-			return winston.warn('[plugins/elasticsearch] no payload for pid ' + topicObj.mainPid);
+			return winston.warn('[plugins/elasticsearch] no payload for pid ' + obj.topic.mainPid);
 		}
 
-		payload.title = topicObj.title;
+		payload.title = obj.topic.title;
 		Elasticsearch.add(payload);
 	});
 };
@@ -726,29 +769,29 @@ Elasticsearch.rebuildIndex = function(req, res) {
 	});
 };
 
-Elasticsearch.createIndex = function(callback) {
-	if (!Elasticsearch.client) {
-		return callback(new Error('not-connected'));
-	}
+// Elasticsearch.createIndex = function(callback) {
+// 	if (!Elasticsearch.client) {
+// 		return callback(new Error('not-connected'));
+// 	}
 
-	var indexName = Elasticsearch.config.index_name;
-	if (indexName && 0 < indexName.length) {
-		Elasticsearch.client.indices.create({
-			index : Elasticsearch.config.index_name
-		}, function(err, results){
-			if (!err) {
-				callback(null, results);
-			}
-			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
-				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
-				callback(null);
-			}
-			else {
-				callback(err);
-			}
-		});
-	}
-};
+// 	var indexName = Elasticsearch.config.index_name;
+// 	if (indexName && 0 < indexName.length) {
+// 		Elasticsearch.client.indices.create({
+// 			index : Elasticsearch.config.index_name
+// 		}, function(err, results){
+// 			if (!err) {
+// 				callback(null, results);
+// 			}
+// 			else if ( /IndexAlreadyExistsException/im.test(err.message) ) { // we can ignore if index is already there
+// 				winston.info("[plugin/elasticsearch] Ignoring error creating mapping " + err);
+// 				callback(null);
+// 			}
+// 			else {
+// 				callback(err);
+// 			}
+// 		});
+// 	}
+// };
 
 Elasticsearch.deleteIndex = function(callback) {
 	if (!Elasticsearch.client) {

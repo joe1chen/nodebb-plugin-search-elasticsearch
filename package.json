@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-search-elasticsearch",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Full-text searching using Elasticsearch",
   "main": "library.js",
   "repository": {
@@ -34,9 +34,11 @@
   "dependencies": {
     "elasticsearch": "^12.1.3",
     "lru-cache": "^2.5.0",
-    "underscore.string": "^2.4.0"
+    "underscore": "*",
+    "underscore.string": "*"
+
   },
   "nbbpm": {
-    "compatibility": "^1.x.x"
+    "compatibility": "^1.5.x"
   }
 }
